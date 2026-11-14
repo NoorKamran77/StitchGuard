@@ -1,6 +1,26 @@
 import cv2
 import numpy as np
 
+# Re-export key functionality from specialized modules
+from src.blending import (
+    blend_no_blend,
+    blend_basic_alpha,
+    blend_distance_feather,
+    blend_adaptive_seam,
+    find_optimal_seam,
+)
+from src.exposure import (
+    compensate_exposure_gain,
+    compensate_exposure_blocks,
+    compensate_exposure,
+)
+from src.metrics import (
+    compute_photometric_metrics,
+    compute_seam_discontinuity,
+    compute_ssim_overlap,
+    PerformanceTracker,
+)
+
 
 def draw_good_matches(image1, kp1, image2, kp2, matches, output_path):
     """Save a visualization of accepted feature matches."""
@@ -9,6 +29,7 @@ def draw_good_matches(image1, kp1, image2, kp2, matches, output_path):
         flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS
     )
     cv2.imwrite(str(output_path), vis)
+    return vis
 
 
 def draw_inlier_matches(image1, kp1, image2, kp2, matches, inlier_mask,
@@ -21,33 +42,33 @@ def draw_inlier_matches(image1, kp1, image2, kp2, matches, inlier_mask,
         flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS
     )
     cv2.imwrite(str(output_path), vis)
+    return vis
 
 
 def compose_no_blend(canvas1, warped2, mask1, mask2):
     """Hard overlay baseline: image 1 wins in the overlap."""
-    result = canvas1.copy()
-    only2 = (mask2 > 0) & (mask1 == 0)
-    result[only2] = warped2[only2]
-    return result
+    return blend_no_blend(canvas1, warped2, mask1, mask2)
 
 
 def compose_basic_blend(canvas1, warped2, mask1, mask2):
     """Simple 50/50 alpha blend in the overlap."""
-    result = canvas1.copy()
-    only2 = (mask2 > 0) & (mask1 == 0)
-    overlap = (mask1 > 0) & (mask2 > 0)
+    return blend_basic_alpha(canvas1, warped2, mask1, mask2, alpha=0.5)
 
-    result[only2] = warped2[only2]
-    result[overlap] = (
-        0.5 * canvas1[overlap].astype(np.float32)
-        + 0.5 * warped2[overlap].astype(np.float32)
-    ).astype(np.uint8)
 
-    return result
+def compose_feather_blend(canvas1, warped2, mask1, mask2):
+    """Distance-transform linear feathering blend."""
+    return blend_distance_feather(canvas1, warped2, mask1, mask2)
+
+
+def compose_adaptive_seam_blend(canvas1, warped2, mask1, mask2, feather_radius=11, return_details=False):
+    """Adaptive seam blending with optimal energy path and narrow-band feathering."""
+    return blend_adaptive_seam(canvas1, warped2, mask1, mask2,
+                               feather_radius=feather_radius,
+                               return_details=return_details)
 
 
 def compute_overlap_seam_error(canvas1, warped2, mask1, mask2):
-    """Initial diagnostic: mean absolute grayscale difference in overlap."""
+    """Mean absolute grayscale difference in the overlap region."""
     overlap = (mask1 > 0) & (mask2 > 0)
 
     if not np.any(overlap):

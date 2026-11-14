@@ -1,0 +1,9 @@
+Stage,Latency (ms)
+Sift Detection,294.67409988865256
+Feature Matching,57.625000132247806
+Homography No Ransac,2.6814001612365246
+Homography Ransac,1.3808999210596085
+Warping To Canvas,13.142299838364124
+Exposure Compensation,162.41219989024103
+Adaptive Seam Blending,430.9949998278171
+Total Pipeline Ms,962.9108996596187

@@ -49,3 +49,31 @@ def estimate_homography(kp1, kp2, matches, use_ransac=True,
         raise RuntimeError("Homography estimation failed.")
 
     return H, mask.ravel().astype(bool), src_pts, dst_pts
+
+
+def compute_reprojection_errors(H, src_pts, dst_pts):
+    """Compute Euclidean reprojection errors for correspondences under homography H.
+
+    Formula:
+        e_i = || dst_pts_i - pi(H * src_pts_i) ||_2
+
+    Returns:
+        errors (np.ndarray): 1D array of per-point reprojection errors.
+        rmse (float): Root mean squared reprojection error.
+        mae (float): Mean absolute reprojection error.
+    """
+    if H is None or len(src_pts) == 0:
+        return np.array([]), float("nan"), float("nan")
+
+    src = src_pts.reshape(-1, 1, 2)
+    dst = dst_pts.reshape(-1, 2)
+
+    # Project src_pts using H
+    projected = cv2.perspectiveTransform(src, H).reshape(-1, 2)
+
+    # Compute Euclidean distance
+    errors = np.linalg.norm(dst - projected, axis=1)
+    rmse = float(np.sqrt(np.mean(errors ** 2)))
+    mae = float(np.mean(errors))
+
+    return errors, rmse, mae
